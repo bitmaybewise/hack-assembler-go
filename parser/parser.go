@@ -38,7 +38,7 @@ func (p *Parser) ReadLine() (string, error) {
 
 	line = strings.Replace(line, "\r", "", 1)
 	line = strings.Replace(line, "\n", "", 1)
-	line = strings.Trim(line, "")
+	line = strings.Trim(line, " ")
 	if line == "" {
 		return "", IgnoredLine
 	}
@@ -69,6 +69,8 @@ func Symbol(line string) string {
 	if strings.HasPrefix(line, "@") {
 		return line[1:]
 	}
+	line = strings.Replace(line, "(", "", 1)
+	line = strings.Replace(line, ")", "", 1)
 	return line
 }
 

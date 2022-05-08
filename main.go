@@ -16,7 +16,7 @@ func main() {
 	if filename == "" {
 		panic("filename is missing")
 	}
-	fmt.Printf("file loaded: %s\n", filename)
+	fmt.Printf("input:\t%s\n", filename)
 
 	asmFile := openAsmFile(filename)
 	defer asmFile.Close()
@@ -34,7 +34,7 @@ func openAsmFile(filename string) *os.File {
 
 func writeToHackFile(filename string, content string) {
 	outputFilename := strings.Replace(filename, ".asm", ".hack", 1)
-	fmt.Println("outputFilename:", outputFilename)
+	fmt.Printf("output:\t%s\n", outputFilename)
 
 	err := os.WriteFile(outputFilename, []byte(content), 0666)
 	if err != nil {
