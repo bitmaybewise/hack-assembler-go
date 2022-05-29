@@ -17,19 +17,76 @@ const (
 
 var IgnoredLine = errors.New("ignored line")
 
+type ParsedLine struct {
+	value string
+}
+
+func (pl ParsedLine) IsL() bool {
+	return InstructionType(pl.value) == L_INSTRUCTION
+}
+
+func (pl ParsedLine) IsA() bool {
+	return InstructionType(pl.value) == A_INSTRUCTION
+}
+
+func (pl ParsedLine) IsC() bool {
+	return InstructionType(pl.value) == C_INSTRUCTION
+}
+
+func (pl ParsedLine) Symbol() string {
+	if strings.HasPrefix(pl.value, "@") {
+		return pl.value[1:]
+	}
+	pl.value = strings.Replace(pl.value, "(", "", 1)
+	pl.value = strings.Replace(pl.value, ")", "", 1)
+	return pl.value
+}
+
+func (pl ParsedLine) Dest() string {
+	command := strings.Split(pl.value, "=")
+	if len(command) == 1 {
+		return ""
+	}
+	return command[0]
+}
+
+func (pl ParsedLine) Comp() (comp string) {
+	command := strings.Split(pl.value, "=")
+	if len(command) > 1 {
+		comp = command[1]
+	} else {
+		comp = command[0]
+	}
+	command = strings.Split(comp, ";")
+	if len(command) > 1 {
+		comp = command[0]
+	}
+	return
+}
+
+func (pl ParsedLine) Jump() string {
+	command := strings.Split(pl.value, ";")
+	if len(command) == 1 {
+		return ""
+	}
+	return command[1]
+}
+
+var EmptyLine = ParsedLine{}
+
 type Parser struct {
 	input *bufio.Reader
 }
 
-func (p *Parser) ReadLine() (string, error) {
+func (p *Parser) ReadLine() (ParsedLine, error) {
 	line, err := p.input.ReadString('\n')
 	if err != nil {
-		return "", err
+		return EmptyLine, err
 	}
 
 	// removing comment
 	if strings.HasPrefix(line, "//") {
-		return "", IgnoredLine
+		return EmptyLine, IgnoredLine
 	}
 	commentFoundAt := strings.Index(line, "//")
 	if commentFoundAt > 1 {
@@ -40,10 +97,10 @@ func (p *Parser) ReadLine() (string, error) {
 	line = strings.Replace(line, "\n", "", 1)
 	line = strings.Trim(line, " ")
 	if line == "" {
-		return "", IgnoredLine
+		return EmptyLine, IgnoredLine
 	}
 
-	return line, nil
+	return ParsedLine{line}, nil
 }
 
 func New(input io.Reader) Parser {
@@ -63,43 +120,4 @@ func InstructionType(line string) Instruction {
 	}
 
 	return L_INSTRUCTION
-}
-
-func Symbol(line string) string {
-	if strings.HasPrefix(line, "@") {
-		return line[1:]
-	}
-	line = strings.Replace(line, "(", "", 1)
-	line = strings.Replace(line, ")", "", 1)
-	return line
-}
-
-func Dest(line string) string {
-	command := strings.Split(line, "=")
-	if len(command) == 1 {
-		return ""
-	}
-	return command[0]
-}
-
-func Comp(line string) (comp string) {
-	command := strings.Split(line, "=")
-	if len(command) > 1 {
-		comp = command[1]
-	} else {
-		comp = command[0]
-	}
-	command = strings.Split(comp, ";")
-	if len(command) > 1 {
-		comp = command[0]
-	}
-	return
-}
-
-func Jump(line string) string {
-	command := strings.Split(line, ";")
-	if len(command) == 1 {
-		return ""
-	}
-	return command[1]
 }

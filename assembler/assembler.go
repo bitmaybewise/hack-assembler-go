@@ -14,13 +14,19 @@ import (
 
 func Assemble(input *os.File) string {
 	psr := parser.New(input)
+	symbols, parsedLines := firstPass(psr)
+	binary := secondPass(symbols, parsedLines)
+	return binary
+}
 
-	// first pass
-	symbols := make(map[string]int)
+// firstPass builds the symbol table and returns the parsed lines to avoid going over it again
+func firstPass(psr parser.Parser) (symbols map[string]int, lines []parser.ParsedLine) {
+	symbols = make(map[string]int)
 	for k, v := range code.Symbols {
 		symbols[k] = v
 	}
 
+	lines = make([]parser.ParsedLine, 0)
 	var i int
 	for {
 		line, err := psr.ReadLine()
@@ -30,72 +36,55 @@ func Assemble(input *os.File) string {
 		if errors.Is(err, parser.IgnoredLine) {
 			continue
 		}
-		instruction := parser.InstructionType(line)
-		if instruction == parser.A_INSTRUCTION || instruction == parser.C_INSTRUCTION {
+
+		lines = append(lines, line)
+
+		if line.IsL() {
+			symbols[line.Symbol()] = i
+		} else {
 			i++
 		}
-		if instruction == parser.L_INSTRUCTION {
-			symbol := parser.Symbol(line)
-			symbols[symbol] = i
-		}
 	}
 
-	// second pass
-	_, err := input.Seek(0, io.SeekStart)
-	if err != nil {
-		panic(fmt.Sprintf("rewind file error <%s>", err))
-	}
-	psr = parser.New(input)
+	return
+}
 
-	variables := 16
-	var b strings.Builder
-	for {
-		line, err := psr.ReadLine()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if errors.Is(err, parser.IgnoredLine) {
-			continue
-		}
+// secondPass goes over the symbol table to look up for the symbol value and transforms the content into binary
+func secondPass(symbols map[string]int, parsedLines []parser.ParsedLine) string {
+	variables := 16 // reserved memory space starts at address 16
+	var binary strings.Builder
 
-		instruction := parser.InstructionType(line)
+	for _, line := range parsedLines {
 		var parsedContent string
 
-		if instruction == parser.L_INSTRUCTION {
+		if line.IsL() {
 			continue
 		}
-		if instruction == parser.A_INSTRUCTION {
-			symbol := parser.Symbol(line)
-			n, err := strconv.Atoi(symbol)
+		if line.IsA() {
+			n, err := strconv.Atoi(line.Symbol())
 			if err == nil {
 				parsedContent = fmt.Sprintf("%.16b", n)
 			} else {
-				val, ok := symbols[symbol]
+				val, ok := symbols[line.Symbol()]
 				if ok {
 					parsedContent = fmt.Sprintf("%.16b", val)
 				} else {
-					symbols[symbol] = variables
+					symbols[line.Symbol()] = variables
 					parsedContent = fmt.Sprintf("%.16b", variables)
 					variables++
 				}
 			}
 		}
-		if instruction == parser.C_INSTRUCTION {
-			dest := parser.Dest(line)
-			binDest := code.Dest(dest)
-
-			comp := parser.Comp(line)
-			binComp := code.Comp(comp)
-
-			jump := parser.Jump(line)
-			binJump := code.Jump(jump)
-
+		if line.IsC() {
+			binDest := code.Dest(line.Dest())
+			binComp := code.Comp(line.Comp())
+			binJump := code.Jump(line.Jump())
 			parsedContent = fmt.Sprintf("111%s%s%s", binComp, binDest, binJump)
 		}
 
-		b.WriteString(parsedContent)
-		b.WriteByte('\n')
+		binary.WriteString(parsedContent)
+		binary.WriteByte('\n')
 	}
 
-	return b.String()
+	return binary.String()
 }
